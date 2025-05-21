@@ -30,10 +30,8 @@ fn main() -> Result<(), anyhow::Error> {
         .collect::<Vec<String>>()
         .join("\n");
 
-    println!("{string_list:?}");
-
     let app_launcher = Command::new("rofi")
-        .args(["-format", "i", "-dmenu", "-i"])
+        .args(["-format", "i", "-dmenu", "-i", "-p", "Kaomoji"])
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .spawn()?;
