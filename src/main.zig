@@ -2,7 +2,7 @@ const std = @import("std");
 
 const Emoji = struct {
     value: []const u8,
-    description: []const u8,
+    tags: [][]const u8,
 };
 
 pub fn main() !void {
@@ -30,18 +30,17 @@ pub fn main() !void {
 }
 
 fn selectEmoji(allocator: std.mem.Allocator, emojis: []Emoji) !?Emoji {
-    var total_size: usize = 0;
-    for (emojis) |emoji| {
-        total_size += emoji.value.len + emoji.description.len + 2; // 2 = 1 whitespace + 1 new line
-    }
-
-    var str = try std.ArrayList(u8).initCapacity(allocator, total_size);
+    var str = std.ArrayList(u8).init(allocator);
     defer str.deinit();
 
     for (emojis) |emoji| {
         try str.appendSlice(emoji.value);
         try str.append(' ');
-        try str.appendSlice(emoji.description);
+
+        const tags = try std.mem.join(allocator, ", ", emoji.tags);
+        defer allocator.free(tags);
+
+        try str.appendSlice(tags);
         try str.append('\n');
     }
 
@@ -88,4 +87,20 @@ fn copyEmoji(allocator: std.mem.Allocator, emoji: Emoji) !void {
     const cmd = [_][]const u8{ "wl-copy", emoji.value };
     var child = std.process.Child.init(&cmd, allocator);
     _ = try child.spawnAndWait();
+}
+
+test "stuff" {
+    const allocator = std.testing.allocator;
+    const data =
+        \\[
+        \\{ "value": "(>_<)", "tags": ["painful"] },
+        \\{ "value": "( ´-ω･)︻┻┳══━一", "tags": ["sniper"] },
+        \\{ "value": "(/ω･＼)", "tags": ["peering", "shy"] }
+        \\]
+    ;
+
+    const emojis = try std.json.parseFromSlice([]Emoji, allocator, data, .{});
+    defer emojis.deinit();
+
+    _ = try selectEmoji(allocator, emojis.value);
 }
