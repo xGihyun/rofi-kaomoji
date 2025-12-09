@@ -9,7 +9,7 @@ pub fn main() !void {
     const allocator = std.heap.page_allocator;
 
     const HOME = std.posix.getenv("HOME").?;
-    const config_path = try std.fmt.allocPrint(allocator, "{s}/dotfiles-hyprland/emoji.json", .{HOME});
+    const config_path = try std.fmt.allocPrint(allocator, "{s}/.config/kaomoji.json", .{HOME});
     const file = try std.fs.openFileAbsolute(config_path, .{});
     defer file.close();
 
