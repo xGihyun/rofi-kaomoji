@@ -1,6 +1,6 @@
 const std = @import("std");
 
-const Emoji = struct {
+const Kaomoji = struct {
     value: []const u8,
     tags: [][]const u8,
 };
@@ -19,36 +19,37 @@ pub fn main() !void {
 
     _ = try file.readAll(file_buffer);
 
-    const emojis = try std.json.parseFromSlice([]Emoji, allocator, file_buffer, .{});
+    const emojis = try std.json.parseFromSlice([]Kaomoji, allocator, file_buffer, .{});
     defer emojis.deinit();
 
-    const selected_emoji = try selectEmoji(allocator, emojis.value);
+    const selected_emoji = try selectKaomoji(allocator, emojis.value);
 
     if (selected_emoji) |emoji| {
-        try copyEmoji(allocator, emoji);
+        try copyKaomoji(allocator, emoji);
     }
 }
 
-fn selectEmoji(allocator: std.mem.Allocator, emojis: []Emoji) !?Emoji {
-    var str = std.ArrayList(u8).init(allocator);
-    defer str.deinit();
+fn selectKaomoji(allocator: std.mem.Allocator, kaomojis: []Kaomoji) !?Kaomoji {
+    const str_buf = try allocator.alloc(u8, 1024);
+    var str = std.ArrayList(u8).initBuffer(str_buf);
+    defer str.deinit(allocator);
 
-    for (emojis) |emoji| {
-        try str.appendSlice(emoji.value);
-        try str.append(' ');
+    for (kaomojis) |kaomoji| {
+        try str.appendSlice(allocator, kaomoji.value);
+        try str.append(allocator, ' ');
 
-        const tags = try std.mem.join(allocator, ", ", emoji.tags);
+        const tags = try std.mem.join(allocator, ", ", kaomoji.tags);
         defer allocator.free(tags);
 
-        try str.appendSlice(tags);
-        try str.append('\n');
+        try str.appendSlice(allocator, tags);
+        try str.append(allocator, '\n');
     }
 
     const rofi_cmd = [_][]const u8{ "rofi", "-format", "i", "-dmenu", "-i", "-p", "Kaomoji" };
     var child = std.process.Child.init(&rofi_cmd, allocator);
     child.stdin_behavior = .Pipe;
     child.stdout_behavior = .Pipe;
-    child.stderr_behavior = .Pipe;
+    child.stderr_behavior = .Pipe;  
 
     try child.spawn();
 
@@ -73,23 +74,24 @@ fn selectEmoji(allocator: std.mem.Allocator, emojis: []Emoji) !?Emoji {
     }
 
     const trimmed = std.mem.trim(u8, stdout.items, &std.ascii.whitespace);
-    const emoji_idx = try std.fmt.parseInt(usize, trimmed, 10);
-    if (emoji_idx >= emojis.len) {
-        std.debug.print("Emoji index is out of bounds.", .{});
+    const kaomoji_idx = try std.fmt.parseInt(usize, trimmed, 10);
+    if (kaomoji_idx >= kaomojis.len) {
+        std.log.err("Kaomoji index is out of bounds.", .{});
         return null;
     }
 
-    const selected_emoji = emojis[emoji_idx];
+    const selected_emoji = kaomojis[kaomoji_idx];
     return selected_emoji;
 }
 
-fn copyEmoji(allocator: std.mem.Allocator, emoji: Emoji) !void {
-    const cmd = [_][]const u8{ "wl-copy", emoji.value };
+fn copyKaomoji(allocator: std.mem.Allocator, kaomoji: Kaomoji) !void {
+    // Only support Wayland for now
+    const cmd = [_][]const u8{ "wl-copy", kaomoji.value };
     var child = std.process.Child.init(&cmd, allocator);
     _ = try child.spawnAndWait();
 }
 
-test "stuff" {
+test "select kaomoji" {
     const allocator = std.testing.allocator;
     const data =
         \\[
@@ -99,8 +101,11 @@ test "stuff" {
         \\]
     ;
 
-    const emojis = try std.json.parseFromSlice([]Emoji, allocator, data, .{});
+    const emojis = try std.json.parseFromSlice([]Kaomoji, allocator, data, .{});
     defer emojis.deinit();
 
-    _ = try selectEmoji(allocator, emojis.value);
+    const selected = try selectKaomoji(allocator, emojis.value);
+    if (selected) |kaomoji| {
+        std.debug.print("{s}", .{kaomoji.value});
+    }
 }
